@@ -1,10 +1,10 @@
 {
   "mappings": [
-    "/content/aem-boilerplate/:/",
-    "/content/aem-boilerplate/configuration:/.helix/config.json",
-    "/content/aem-boilerplate/metadata:/metadata.json"
+    "/content/vikaushi-xwalk-site/:/",
+    "/content/vikaushi-xwalk-site/configuration:/.helix/config.json",
+    "/content/vikaushi-xwalk-site/metadata:/metadata.json"
   ],
   "includes": [
-    "/content/aem-boilerplate/"
+    "/content/vikaushi-xwalk-site/"
   ]
 }
