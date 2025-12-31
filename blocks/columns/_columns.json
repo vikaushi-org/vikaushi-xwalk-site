@@ -1,7 +1,7 @@
 {
   "definitions": [
     {
-      "title": "Columns",
+      "title": "Columns title from code",
       "id": "columns",
       "plugins": {
         "xwalk": {
@@ -25,14 +25,14 @@
           "valueType": "number",
           "name": "columns",
           "value": "",
-          "label": "Columns"
+          "label": "Columns from models"
         },
         {
           "component": "text",
           "valueType": "number",
           "name": "rows",
           "value": "",
-          "label": "Rows"
+          "label": "Rows from models"
         }
       ]
     }
