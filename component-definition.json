@@ -1,11 +1,11 @@
 {
   "groups": [
     {
-      "title": "Default Content",
+      "title": "vikaushi Default Content",
       "id": "default",
       "components": [
         {
-          "title": "Text",
+          "title": "vikaushi Text",
           "id": "text",
           "plugins": {
             "xwalk": {
@@ -59,7 +59,7 @@
       ]
     },
     {
-      "title": "Sections",
+      "title": "vikaushi Sections",
       "id": "sections",
       "components": [
         {
@@ -79,7 +79,7 @@
       ]
     },
     {
-      "title": "Blocks",
+      "title": "vikaushi Blocks",
       "id": "blocks",
       "components": [
         {
@@ -168,6 +168,7 @@
                   "name": "Quote",
                   "model": "quote",
                   "author": "Biff Tannen",
+                  "author2": "Vineet Kaushik",
                   "quote": "<p>Think, McFly! Think!</p>"
                 }
               }

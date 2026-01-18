@@ -75,6 +75,10 @@
           {
             "name": "h6",
             "value": "h6"
+          },
+          {
+            "name": "h7",
+            "value": "h7"
           }
         ]
       }
@@ -231,7 +235,13 @@
          "name": "author",
          "label": "Author",
          "value": ""
-       },
+       },  {
+        "component": "text",
+        "valueType": "string",
+        "name": "author2",
+        "label": "Author2",
+        "value": "Author2"
+      },
        {
         "component": "select",
         "name": "classes",
