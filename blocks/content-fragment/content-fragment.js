@@ -1,20 +1,11 @@
 /*
  * Content Fragment Block
  * Renders an AEM Content Fragment on the page.
- * Fetches CF data via the AEM Assets HTTP API and renders the fields.
+ * Fetches CF data from the AEM author/publish Assets HTTP API.
  */
 
-const AEM_HOSTS = [
-  'https://publish-p124869-e1429323.adobeaemcloud.com',
-  'https://author-p124869-e1429323.adobeaemcloud.com',
-];
-
 /**
- * Extracts a clean /content/dam/... path from whatever the block contains.
- * The block may contain:
- *  - A full URL like https://...aem.page/content/dam/wknd-shared/...
- *  - A JCR path like /content/dam/wknd-shared/...
- *  - Just text like /content/dam/wknd-shared/...
+ * Extracts a /content/dam/... path from the block's link or text.
  */
 function extractCFPath(block) {
   const link = block.querySelector('a');
@@ -31,46 +22,62 @@ function extractCFPath(block) {
     // use as-is
   }
 
-  // Ensure it starts with /content/dam
-  const damIdx = path.indexOf('/content/dam');
+  // Strip trailing .html
+  path = path.replace(/\.html$/, '');
+
+  // Find /content/dam in the path
+  const damIdx = path.indexOf('/content/dam/');
   if (damIdx >= 0) {
     return path.substring(damIdx);
   }
 
-  // Maybe it's just the text without /content/dam prefix
   return path;
 }
 
 /**
- * Converts a /content/dam/... path to the Assets HTTP API path.
- * e.g. /content/dam/wknd-shared/en/contributors/kumar-selveraj
- *   -> wknd-shared/en/contributors/kumar-selveraj
+ * Converts /content/dam/... to the Assets API sub-path.
  */
-function toAssetApiPath(cfPath) {
+function toApiPath(cfPath) {
   return cfPath.replace(/^\/content\/dam\//, '');
 }
 
 /**
- * Tries to fetch CF JSON from each AEM host in order.
+ * Fetches the CF JSON. In the Universal Editor (author domain), fetch from
+ * the same origin. On the published EDS site, try publish then author.
  */
 async function fetchCF(cfPath) {
   if (!cfPath) return null;
 
-  const assetPath = toAssetApiPath(cfPath);
+  const apiSubPath = toApiPath(cfPath);
 
-  for (const host of AEM_HOSTS) {
+  // When running inside the UE or on the author domain, same-origin works
+  const sameOriginUrl = `/api/assets/${apiSubPath}.json`;
+  try {
+    const resp = await fetch(sameOriginUrl, { credentials: 'same-origin' });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.properties) return data;
+    }
+  } catch (e) {
+    // not on author, try cross-origin
+  }
+
+  // Cross-origin attempts for EDS preview/live
+  const hosts = [
+    'https://publish-p124869-e1429323.adobeaemcloud.com',
+    'https://author-p124869-e1429323.adobeaemcloud.com',
+  ];
+
+  for (const host of hosts) {
     try {
-      const apiUrl = `${host}/api/assets/${assetPath}.json`;
       // eslint-disable-next-line no-await-in-loop
-      const resp = await fetch(apiUrl, {
+      const resp = await fetch(`${host}/api/assets/${apiSubPath}.json`, {
         credentials: host.includes('author') ? 'include' : 'omit',
       });
-      if (resp.ok) {
-        // eslint-disable-next-line no-await-in-loop
-        return await resp.json();
-      }
+      // eslint-disable-next-line no-await-in-loop
+      if (resp.ok) return await resp.json();
     } catch (e) {
-      // try next host
+      // try next
     }
   }
 
@@ -78,7 +85,7 @@ async function fetchCF(cfPath) {
 }
 
 /**
- * Renders a single CF element field.
+ * Renders a CF element field.
  */
 function renderElement(name, element) {
   const wrapper = document.createElement('div');
@@ -89,25 +96,26 @@ function renderElement(name, element) {
   label.textContent = element.title || name;
   wrapper.append(label);
 
-  const { value, ':type': type } = element;
+  const val = element.value;
+  const type = element[':type'] || '';
 
-  if (value === undefined || value === null || value === '') return null;
+  if (val === undefined || val === null || val === '') return null;
 
-  if (Array.isArray(value)) {
+  if (Array.isArray(val)) {
     const ul = document.createElement('ul');
-    value.forEach((item) => {
+    val.forEach((item) => {
       const li = document.createElement('li');
       li.textContent = item;
       ul.append(li);
     });
     wrapper.append(ul);
-  } else if (type === 'text/html' || (typeof value === 'string' && value.trim().startsWith('<'))) {
+  } else if (type === 'text/html' || (typeof val === 'string' && val.trim().startsWith('<'))) {
     const content = document.createElement('div');
-    content.innerHTML = value;
+    content.innerHTML = val;
     wrapper.append(content);
   } else {
     const p = document.createElement('p');
-    p.textContent = String(value);
+    p.textContent = String(val);
     wrapper.append(p);
   }
 
@@ -117,7 +125,6 @@ function renderElement(name, element) {
 export default async function decorate(block) {
   const cfPath = extractCFPath(block);
 
-  // Clear the block content (remove the link/button)
   block.textContent = '';
 
   if (!cfPath) {
@@ -126,7 +133,7 @@ export default async function decorate(block) {
   }
 
   const loading = document.createElement('p');
-  loading.textContent = 'Loading content fragment…';
+  loading.textContent = 'Loading…';
   block.append(loading);
 
   const data = await fetchCF(cfPath);
@@ -134,14 +141,13 @@ export default async function decorate(block) {
 
   if (!data) {
     block.innerHTML = `<p class="content-fragment-error">
-      Could not load content fragment: <code>${cfPath}</code>
+      Could not load content fragment: <code>${cfPath}</code><br>
+      <small>Ensure the content fragment is published, or view this page in the Universal Editor.</small>
     </p>`;
     return;
   }
 
   const props = data.properties || {};
-
-  // Render title
   const title = props.title || props['dc:title'] || data.title || '';
   if (title) {
     const h2 = document.createElement('h2');
@@ -149,32 +155,26 @@ export default async function decorate(block) {
     block.append(h2);
   }
 
-  // Render description
-  const description = props.description || props['dc:description'] || '';
-  if (description) {
+  if (props.description) {
     const p = document.createElement('p');
     p.classList.add('content-fragment-description');
-    p.textContent = description;
+    p.textContent = props.description;
     block.append(p);
   }
 
-  // Render CF model elements
   const elements = props.elements || {};
   const keys = Object.keys(elements);
-
   if (keys.length > 0) {
-    const fieldsContainer = document.createElement('div');
-    fieldsContainer.classList.add('content-fragment-fields');
-
+    const container = document.createElement('div');
+    container.classList.add('content-fragment-fields');
     keys.forEach((key) => {
       const el = renderElement(key, elements[key]);
-      if (el) fieldsContainer.append(el);
+      if (el) container.append(el);
     });
-
-    block.append(fieldsContainer);
+    block.append(container);
   }
 
-  // If nothing rendered at all (no title, no elements), show the raw JSON
+  // Fallback: if nothing rendered, show raw data
   if (block.children.length === 0) {
     const pre = document.createElement('pre');
     pre.textContent = JSON.stringify(data, null, 2);
