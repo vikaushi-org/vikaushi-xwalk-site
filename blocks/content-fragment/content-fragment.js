@@ -1,81 +1,61 @@
 /*
  * Content Fragment Block
- * Renders an AEM Content Fragment on the page.
- * https://www.aem.live/developer/block-collection/content-fragment
+ * Include an AEM Content Fragment or Experience Fragment on the page.
+ * Fetches the fragment as a page via .plain.html and renders its content inline.
  */
 
-const defined = (value) => value !== undefined && value !== null && value !== '';
+// eslint-disable-next-line import/no-cycle
+import {
+  decorateMain,
+} from '../../scripts/scripts.js';
 
-function renderField(name, value) {
-  const div = document.createElement('div');
-  div.classList.add('content-fragment-field');
-  div.dataset.field = name;
+import {
+  loadSections,
+} from '../../scripts/aem.js';
 
-  if (Array.isArray(value)) {
-    const ul = document.createElement('ul');
-    value.forEach((item) => {
-      const li = document.createElement('li');
-      li.textContent = item;
-      ul.append(li);
-    });
-    div.append(ul);
-  } else if (typeof value === 'string' && value.startsWith('<')) {
-    div.innerHTML = value;
-  } else if (defined(value)) {
-    const p = document.createElement('p');
-    p.textContent = value;
-    div.append(p);
-  }
-
-  return div;
-}
-
-async function fetchContentFragment(path) {
+/**
+ * Loads a content/experience fragment by path.
+ * @param {string} path The path to the fragment
+ * @returns {HTMLElement|null} The root element of the fragment
+ */
+async function loadContentFragment(path) {
   if (!path) return null;
 
-  const cfPath = path.replace(/^\/content\/dam/, '');
-  const resp = await fetch(`${cfPath}.cfm.gql.json`);
+  // Normalize: strip .html suffix if present
+  // eslint-disable-next-line no-param-reassign
+  path = path.replace(/(\.plain)?\.html$/, '');
+
+  const resp = await fetch(`${path}.plain.html`);
   if (resp.ok) {
-    return resp.json();
-  }
+    const main = document.createElement('main');
+    main.innerHTML = await resp.text();
 
-  const fallback = await fetch(`${cfPath}.json`);
-  if (fallback.ok) {
-    return fallback.json();
-  }
+    // Reset base path for media to fragment base
+    const resetAttributeBase = (tag, attr) => {
+      main.querySelectorAll(`${tag}[${attr}^="./media_"]`).forEach((elem) => {
+        elem[attr] = new URL(elem.getAttribute(attr), new URL(path, window.location)).href;
+      });
+    };
+    resetAttributeBase('img', 'src');
+    resetAttributeBase('source', 'srcset');
 
+    decorateMain(main);
+    await loadSections(main);
+    return main;
+  }
   return null;
 }
 
 export default async function decorate(block) {
   const link = block.querySelector('a');
-  const path = link
-    ? link.getAttribute('href')
-    : block.textContent.trim();
-
-  if (!path) return;
-
-  block.textContent = '';
-
-  const data = await fetchContentFragment(path);
-  if (!data) {
-    block.textContent = '';
-    return;
-  }
-
-  const fields = data.fields || data.properties || data;
-  const title = data.title || fields.title || fields.name;
-
-  if (title) {
-    const h2 = document.createElement('h2');
-    h2.textContent = title;
-    block.append(h2);
-  }
-
-  if (typeof fields === 'object' && !Array.isArray(fields)) {
-    Object.entries(fields).forEach(([name, value]) => {
-      if (name.startsWith('cq:') || name.startsWith('jcr:') || name === 'title') return;
-      block.append(renderField(name, value));
-    });
+  const path = link ? link.getAttribute('href') : block.textContent.trim();
+  const fragment = await loadContentFragment(path);
+  if (fragment) {
+    const fragmentSection = fragment.querySelector(':scope .section');
+    if (fragmentSection) {
+      block.classList.add(...fragmentSection.classList);
+      block.classList.remove('section');
+      block.replaceChildren(...fragmentSection.childNodes);
+    }
   }
 }
