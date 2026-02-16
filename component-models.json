@@ -194,6 +194,16 @@
     ]
   },
   {
+    "id": "content-fragment",
+    "fields": [
+      {
+        "component": "aem-content",
+        "name": "reference",
+        "label": "Content Fragment"
+      }
+    ]
+  },
+  {
     "id": "hero",
     "fields": [
       {
