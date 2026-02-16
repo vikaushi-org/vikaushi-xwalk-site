@@ -1,5 +1,5 @@
 mountpoints:
   /:
-    url: "https://author-p124869-e1429323.adobeaemcloud.com/bin/franklin.delivery/vikaushi-org/vikaushi-xwalk-site/cf"
+    url: "https://author-p124869-e1429323.adobeaemcloud.com/bin/franklin.delivery/vikaushi-org/vikaushi-xwalk-site/main"
     type: "markup"
     suffix: ".html"
